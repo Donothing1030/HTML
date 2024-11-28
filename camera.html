@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拍照並存入相簿</title>
+</head>
+<body>
+    <h1>拍照並保存圖片</h1>
+
+    <!-- 使用input選擇器來啟動相機 -->
+    <input type="file" accept="image/*" capture="camera" id="cameraInput">
+    <br><br>
+
+    <div id="photoContainer">
+        <h2>您的照片：</h2>
+        <img id="capturedImage" src="" alt="拍攝的照片" style="max-width: 100%; display: none;">
+    </div>
+
+    <script>
+        // 監聽相機拍照的事件
+        document.getElementById('cameraInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];  // 取得拍照的文件
+            if (file) {
+                const reader = new FileReader();
+                
+                // 將圖片載入並顯示
+                reader.onload = function(e) {
+                    const imageElement = document.getElementById('capturedImage');
+                    imageElement.src = e.target.result;
+                    imageElement.style.display = 'block';
+                };
+                
+                reader.readAsDataURL(file);  // 將文件讀取為Data URL
+            }
+        });
+    </script>
+</body>
+</html>
