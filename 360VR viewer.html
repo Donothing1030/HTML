@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>360全景圖展示</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    #panorama {
+      width: 100%;
+      height: 100vh;
+      position: relative;
+    }
+    #uploadBtn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      padding: 10px;
+      background-color: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      cursor: pointer;
+      z-index: 1000;
+    }
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <button id="uploadBtn">上傳全景圖</button>
+  <input type="file" id="fileInput" accept="image/*" />
+  
+  <div id="panorama"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" />
+  
+  <script>
+    const panoramaElement = document.getElementById('panorama');
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    let viewer;
+
+    // 初始化全景圖
+    function initializePanorama(imagePath) {
+      if (viewer) {
+        viewer.destroy(); // 先摧毀當前全景圖顯示器
+      }
+
+      viewer = pannellum.viewer(panoramaElement, {
+        type: 'equirectangular',
+        panorama: imagePath,
+        autoLoad: true,
+        hotSpotDebug: false,
+        mouse: {
+          zoom: true,
+          drag: true
+        },
+        deviceOrientation: {
+          enabled: true // 啟用陀螺儀控制
+        }
+      });
+    }
+
+    // 上傳全景圖事件處理
+    uploadBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          initializePanorama(e.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  </script>
+</body>
+</html>

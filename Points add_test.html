@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Image Marker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    #canvas-container {
+      position: relative;
+      display: inline-block;
+      border: 1px solid #ccc;
+      overflow: hidden;
+      cursor: grab;
+    }
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+    canvas {
+      cursor: crosshair;
+    }
+    .dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: red;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .delete-btn {
+      position: absolute;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      padding: 2px 5px;
+      font-size: 10px;
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+    }
+    #coordinates {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Interactive Image Marker</h1>
+  <input type="file" id="image-upload" accept="image/*">
+  <p>Zoom Level: <span id="zoom-level">100%</span></p>
+  <div id="canvas-container">
+    <canvas id="image-canvas"></canvas>
+  </div>
+  <div id="coordinates">
+    <h3>Coordinates</h3>
+    <ul id="coordinate-list"></ul>
+  </div>
+  <script>
+    const canvas = document.getElementById('image-canvas');
+    const ctx = canvas.getContext('2d');
+    const imageUpload = document.getElementById('image-upload');
+    const canvasContainer = document.getElementById('canvas-container');
+    const zoomLevelDisplay = document.getElementById('zoom-level');
+    const coordinateList = document.getElementById('coordinate-list');
+    let image = new Image();
+    let dots = [];
+    let scale = 1;
+    let originX = 0;
+    let originY = 0;
+    let isDragging = false;
+    let isPanning = false;
+    let isDraggingDot = false;
+    let draggedDotIndex = -1;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+
+    // 上傳圖片並載入
+    imageUpload.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          image.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // 圖片載入後，設置畫布大小並繪製圖片
+    image.onload = () => {
+      scale = 1;
+      originX = 0;
+      originY = 0;
+      canvas.width = image.width;
+      canvas.height = image.height;
+      canvasContainer.style.width = image.width + 'px';
+      canvasContainer.style.height = image.height + 'px';
+      drawImage();  // 初次繪製圖片
+      updateDots(); // 初次顯示圓點
+    };
+
+    // 按下滑鼠時，判斷是否點擊在圓點上
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) { // 檢查是否是左鍵
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - originX) / scale;
+        const y = (e.clientY - rect.top - originY) / scale;
+
+        // 檢查是否點擊在圓點上
+        draggedDotIndex = findDotUnderMouse(x, y);
+        if (draggedDotIndex !== -1) {
+          isDraggingDot = true;  // 開始拖動圓點
+          isDragging = false;    // 禁止平移圖片
+        } else {
+          isDragging = true;     // 開始平移圖片
+          isPanning = false;
+          lastMouseX = e.clientX;
+          lastMouseY = e.clientY;
+        }
+      }
+    });
+
+    // 滑鼠移動時的處理
+    canvas.addEventListener('mousemove', (e) => {
+      if (isDraggingDot) { // 如果正在拖動圓點
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - originX) / scale;
+        const y = (e.clientY - rect.top - originY) / scale;
+
+        // 更新圓點位置
+        dots[draggedDotIndex].x = x;
+        dots[draggedDotIndex].y = y;
+        updateCoordinates();  // 更新座標顯示
+        updateDots();         // 更新圓點顯示
+      } else if (isDragging) { // 如果正在平移圖片
+        const dx = e.clientX - lastMouseX;
+        const dy = e.clientY - lastMouseY;
+
+        // 只有當滑鼠移動超過一定距離時才開始平移
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+          isPanning = true;
+        }
+
+        originX += dx;
+        originY += dy;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+
+        drawImage();  // 重新繪製圖片
+        updateDots(); // 更新圓點顯示
+      }
+    });
+
+    // 滑鼠放開時的處理
+    canvas.addEventListener('mouseup', (e) => {
+      if (e.button === 0) { // 檢查是否是左鍵
+        if (isDraggingDot) {
+          isDraggingDot = false;  // 停止拖動圓點
+        } else if (!isPanning) { // 如果不是平移操作，則新增圓點
+          const rect = canvas.getBoundingClientRect();
+          const x = (e.clientX - rect.left - originX) / scale;
+          const y = (e.clientY - rect.top - originY) / scale;
+
+          // 確保新增圓點位置在圖片範圍內
+          if (x >= 0 && y >= 0 && x <= image.width && y <= image.height) {
+            addDot(x, y);
+          }
+        }
+        isDragging = false; // 停止平移圖片
+      }
+    });
+
+    // 滑鼠離開畫布時的處理
+    canvas.addEventListener('mouseleave', () => {
+      isDragging = false;
+      isDraggingDot = false;
+    });
+
+    // 檢查滑鼠是否在圓點範圍內
+    function findDotUnderMouse(x, y) {
+      return dots.findIndex(dot => {
+        const screenX = dot.x * scale + originX;
+        const screenY = dot.y * scale + originY;
+        return Math.abs(x - screenX) < 10 && Math.abs(y - screenY) < 10;
+      });
+    }
+
+    // 新增圓點
+    function addDot(x, y) {
+      dots.push({ x, y });
+      updateCoordinates();  // 更新座標顯示
+      updateDots();         // 更新圓點顯示
+    }
+
+    // 更新圓點顯示
+    function updateDots() {
+      // 清除畫布中已經顯示的圓點和刪除按鈕
+      Array.from(canvasContainer.querySelectorAll('.dot, .delete-btn')).forEach(el => el.remove());
+
+      // 重新顯示所有圓點，考慮縮放和位置偏移
+      dots.forEach((dot, index) => {
+        const screenX = dot.x * scale + originX;
+        const screenY = dot.y * scale + originY;
+
+        const dotEl = document.createElement('div');
+        dotEl.className = 'dot';
+        dotEl.style.left = `${screenX}px`;
+        dotEl.style.top = `${screenY}px`;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = 'X';
+        deleteBtn.style.left = `${screenX + 10}px`;
+        deleteBtn.style.top = `${screenY}px`;
+
+        // 點擊刪除圓點
+        deleteBtn.addEventListener('click', () => {
+          dots.splice(index, 1);
+          updateCoordinates();
+          updateDots();
+        });
+
+        canvasContainer.appendChild(dotEl);
+        canvasContainer.appendChild(deleteBtn);
+      });
+    }
+
+    // 更新座標顯示
+    function updateCoordinates() {
+      coordinateList.innerHTML = '';
+      dots.forEach((dot, index) => {
+        const li = document.createElement('li');
+        li.textContent = `Dot ${index + 1}: (${Math.round(dot.x)}, ${Math.round(dot.y)})`;
+        coordinateList.appendChild(li);
+      });
+    }
+
+    // 繪製圖片
+    function drawImage() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // 清空畫布
+      ctx.setTransform(scale, 0, 0, scale, originX, originY); // 設置縮放與平移
+      ctx.drawImage(image, 0, 0); // 繪製圖片
+    }
+
+    // 處理圖片縮放
+    canvasContainer.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = 0.1;
+      const oldScale = scale;
+
+      // 根據滑鼠滾輪縮放圖片
+      if (e.deltaY < 0) {
+        scale += zoomFactor;
+      } else if (e.deltaY > 0 && scale > zoomFactor) {
+        scale -= zoomFactor;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - originX) / oldScale;
+      const mouseY = (e.clientY - rect.top - originY) / oldScale;
+
+      // 根據滑鼠位置調整縮放的原點
+      originX = e.clientX - rect.left - mouseX * scale;
+      originY = e.clientY - rect.top - mouseY * scale;
+
+      zoomLevelDisplay.textContent = `${Math.round(scale * 100)}%`;
+
+      drawImage();
+      updateDots();
+    });
+  </script>
+</body>
+</html>

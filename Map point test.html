@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地圖標記工具</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 20px;
+    }
+    #map-container {
+      position: relative;
+      display: inline-block;
+      margin-top: 20px;
+    }
+    canvas {
+      border: 1px solid #000;
+    }
+    #points-list, #reference-points-list {
+      margin-top: 20px;
+      width: 300px;
+      border: 1px solid #000;
+      padding: 10px;
+      background-color: #f9f9f9;
+    }
+    #points-list ul, #reference-points-list ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    #points-list ul li, #reference-points-list ul li {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+    }
+    .delete-btn {
+      margin-left: 10px;
+      cursor: pointer;
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <h1>地圖標記工具</h1>
+
+  <div>
+    <label for="map-image">上傳地圖圖片:</label>
+    <input type="file" id="map-image" accept="image/*">
+    <p id="status">請點擊按鈕以啟動或關閉新增參考點功能。</p>
+  </div>
+
+  <button id="toggle-reference-mode">啟動新增參考點模式</button>
+
+  <!-- 地圖容器 -->
+  <div id="map-container">
+    <canvas id="map-canvas"></canvas>
+  </div>
+
+  <!-- 參考點管理 -->
+  <div id="reference-points-list">
+    <h3>參考點列表</h3>
+    <ul id="reference-ul"></ul>
+  </div>
+
+  <!-- 圓點座標清單 -->
+  <div id="points-list">
+    <h3>標記的圓點座標</h3>
+    <ul id="points-ul"></ul>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('map-image');
+    const canvas = document.getElementById('map-canvas');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
+    const toggleButton = document.getElementById('toggle-reference-mode');
+    const pointsList = document.getElementById('points-ul');
+    const referenceList = document.getElementById('reference-ul');
+
+    let img = new Image();
+    let referencePoints = [];
+    let pointIndex = 1;
+    let isReferenceMode = false; // 是否處於新增參考點模式
+
+    // 加載圖片
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      status.textContent = '請點擊按鈕以啟動或關閉新增參考點功能。';
+    };
+
+    // 切換模式
+    toggleButton.addEventListener('click', () => {
+      isReferenceMode = !isReferenceMode;
+      toggleButton.textContent = isReferenceMode ? '關閉新增參考點模式' : '啟動新增參考點模式';
+      status.textContent = isReferenceMode
+        ? '新增參考點模式啟動，點擊地圖新增參考點。'
+        : '新增參考點模式關閉，點擊地圖新增圓點。';
+    });
+
+    // 地圖點擊事件
+    canvas.addEventListener('click', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = event.clientX - rect.left;
+      const clickY = event.clientY - rect.top;
+
+      if (isReferenceMode) {
+        // 新增參考點
+        const realX = prompt(`輸入該參考點的真實 X 座標：`);
+        const realY = prompt(`輸入該參考點的真實 Y 座標：`);
+
+        if (realX === null || realY === null || isNaN(realX) || isNaN(realY)) {
+          alert('請輸入有效的座標數值！');
+          return;
+        }
+
+        referencePoints.push({ canvasX: clickX, canvasY: clickY, realX: parseFloat(realX), realY: parseFloat(realY) });
+        updateReferenceList();
+        drawPoint(clickX, clickY, 'blue', `P${referencePoints.length}`);
+      } else {
+        // 新增圓點
+        if (referencePoints.length < 2) {
+          alert('請先新增至少兩個參考點！');
+          return;
+        }
+
+        const calculatedCoords = calculateRealCoordinates(clickX, clickY);
+        drawPoint(clickX, clickY, 'red', `${pointIndex}`);
+
+        const li = document.createElement('li');
+        li.dataset.index = pointIndex;
+        li.innerHTML = `
+          <span>#${pointIndex}: (${calculatedCoords.realX.toFixed(5)}, ${calculatedCoords.realY.toFixed(5)})</span>
+          <button class="delete-btn" data-index="${pointIndex}">刪除</button>
+        `;
+        pointsList.appendChild(li);
+
+        // 刪除按鈕事件
+        li.querySelector('.delete-btn').addEventListener('click', () => {
+          pointsList.removeChild(li);
+          redrawMap();
+        });
+
+        pointIndex++;
+      }
+    });
+
+    // 更新參考點清單
+    function updateReferenceList() {
+      referenceList.innerHTML = '';
+      referencePoints.forEach((point, index) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>P${index + 1}: (${point.realX.toFixed(5)}, ${point.realY.toFixed(5)})</span>
+        `;
+        referenceList.appendChild(li);
+      });
+    }
+
+    // 繪製圓點
+    function drawPoint(x, y, color, label) {
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.closePath();
+
+      ctx.fillStyle = 'black';
+      ctx.font = '12px Arial';
+      ctx.fillText(label, x + 8, y - 8);
+    }
+
+    // 根據多個參考點計算實際座標
+    function calculateRealCoordinates(x, y) {
+      let realX = 0, realY = 0, totalWeight = 0;
+
+      referencePoints.forEach((point) => {
+        const distance = Math.sqrt((x - point.canvasX) ** 2 + (y - point.canvasY) ** 2);
+        const weight = 1 / (distance || 0.001); // 防止距離為零的情況
+        realX += weight * point.realX;
+        realY += weight * point.realY;
+        totalWeight += weight;
+      });
+
+      return { realX: realX / totalWeight, realY: realY / totalWeight };
+    }
+
+    // 重繪地圖
+    function redrawMap() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      referencePoints.forEach((point, index) => {
+        drawPoint(point.canvasX, point.canvasY, 'blue', `P${index + 1}`);
+      });
+    }
+  </script>
+</body>
+</html>

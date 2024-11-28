@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地圖定位範例</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="getLocation()">取得我的位置</button>
+    <p id="status"></p>
+    <div id="map"></div>
+    <script>
+        let map, marker;
+
+        function initializeMap(lat, lng) {
+            map = L.map('map').setView([lat, lng], 13);
+
+            // 使用 OpenStreetMap 圖資
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            marker = L.marker([lat, lng]).addTo(map)
+                .bindPopup("你在這裡!")
+                .openPopup();
+        }
+
+        function updateMarker(lat, lng) {
+            marker.setLatLng([lat, lng])
+                  .bindPopup("更新的位置: " + lat + ", " + lng)
+                  .openPopup();
+            map.setView([lat, lng], 13);
+        }
+
+        function getLocation() {
+            const status = document.getElementById('status');
+
+            if (navigator.geolocation) {
+                status.textContent = "定位中...";
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const { latitude, longitude } = position.coords;
+                    status.textContent = `緯度: ${latitude}, 經度: ${longitude}`;
+
+                    if (!map) {
+                        initializeMap(latitude, longitude);
+                    } else {
+                        updateMarker(latitude, longitude);
+                    }
+                }, showError);
+            } else {
+                status.textContent = "瀏覽器不支援定位功能";
+            }
+        }
+
+        function showError(error) {
+            const errors = {
+                1: "使用者拒絕提供位置資訊",
+                2: "無法取得位置資訊",
+                3: "定位逾時"
+            };
+            document.getElementById('status').textContent = errors[error.code] || "未知錯誤";
+        }
+    </script>
+</body>
+</html>

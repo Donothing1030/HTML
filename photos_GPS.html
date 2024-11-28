@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>照片 GPS 資訊顯示</title>
+  <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .photo-container {
+      margin-bottom: 20px;
+    }
+    img {
+      max-width: 200px;
+      margin-right: 10px;
+    }
+    .info {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>照片 GPS 資訊顯示與轉換</h1>
+  <input type="file" id="photo-input" multiple accept="image/*">
+  <div id="output"></div>
+
+  <script>
+    const photoInput = document.getElementById('photo-input');
+    const output = document.getElementById('output');
+
+    // 工具函數：DMS (度分秒) 轉 十進制
+    function dmsToDecimal(degrees, minutes, seconds, direction) {
+      let decimal = degrees + minutes / 60 + seconds / 3600;
+      if (direction === 'S' || direction === 'W') decimal *= -1;
+      return decimal.toFixed(6); // 保留 6 位小數
+    }
+
+    // 工具函數：十進制轉 DMS
+    function decimalToDms(decimal, isLatitude) {
+      const direction = decimal < 0 ? (isLatitude ? 'S' : 'W') : (isLatitude ? 'N' : 'E');
+      const absDecimal = Math.abs(decimal);
+      const degrees = Math.floor(absDecimal);
+      const minutes = Math.floor((absDecimal - degrees) * 60);
+      const seconds = ((absDecimal - degrees - minutes / 60) * 3600).toFixed(2);
+      return `${degrees}° ${minutes}' ${seconds}" ${direction}`;
+    }
+
+    // 處理照片上傳與 GPS 資訊提取
+    photoInput.addEventListener('change', async (event) => {
+      const files = event.target.files;
+      output.innerHTML = ''; // 清空舊的結果
+
+      for (let file of files) {
+        const container = document.createElement('div');
+        container.className = 'photo-container';
+
+        // 顯示照片
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        container.appendChild(img);
+
+        const info = document.createElement('div');
+        info.className = 'info';
+
+        // 提取 EXIF 資訊
+        const exifData = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              resolve(EXIF.readFromBinaryFile(reader.result));
+            } catch (e) {
+              resolve({});
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        });
+
+        // GPS 資訊處理
+        if (exifData.GPSLatitude && exifData.GPSLongitude) {
+          const lat = dmsToDecimal(
+            exifData.GPSLatitude[0],
+            exifData.GPSLatitude[1],
+            exifData.GPSLatitude[2],
+            exifData.GPSLatitudeRef
+          );
+          const lon = dmsToDecimal(
+            exifData.GPSLongitude[0],
+            exifData.GPSLongitude[1],
+            exifData.GPSLongitude[2],
+            exifData.GPSLongitudeRef
+          );
+
+          const dmsLat = decimalToDms(lat, true);
+          const dmsLon = decimalToDms(lon, false);
+
+          info.innerHTML = `
+            <p>GPS 十進制座標: 緯度 ${lat}, 經度 ${lon}</p>
+            <p>GPS DMS 座標: 緯度 ${dmsLat}, 經度 ${dmsLon}</p>
+          `;
+        } else {
+          info.textContent = '此照片無 GPS 資訊';
+        }
+
+        container.appendChild(info);
+        output.appendChild(container);
+      }
+    });
+  </script>
+</body>
+</html>
