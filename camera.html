@@ -3,21 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拍照並存入相簿</title>
+    <title>拍照並儲存圖片</title>
+    <style>
+        #cameraButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #saveButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 20px;
+            display: none; /* 初始時隱藏儲存按鈕 */
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-    <h1>拍照並保存圖片</h1>
+    <h1>開啟相機拍照並儲存照片</h1>
 
-    <!-- 使用input選擇器來啟動相機 -->
-    <input type="file" accept="image/*" capture="camera" id="cameraInput">
-    <br><br>
-
+    <!-- 自定義開啟相機的按鈕 -->
+    <button id="cameraButton">開啟相機</button>
+    
+    <!-- 隱藏的input，觸發相機拍照 -->
+    <input type="file" accept="image/*" capture="camera" id="cameraInput" style="display: none;">
+    
     <div id="photoContainer">
         <h2>您的照片：</h2>
         <img id="capturedImage" src="" alt="拍攝的照片" style="max-width: 100%; display: none;">
     </div>
 
+    <!-- 儲存圖片的按鈕 -->
+    <button id="saveButton">儲存照片</button>
+
     <script>
+        // 監聽開啟相機的按鈕
+        document.getElementById('cameraButton').addEventListener('click', function() {
+            document.getElementById('cameraInput').click();  // 點擊隱藏的input來開啟相機
+        });
+
         // 監聽相機拍照的事件
         document.getElementById('cameraInput').addEventListener('change', function(event) {
             const file = event.target.files[0];  // 取得拍照的文件
@@ -28,10 +52,24 @@
                 reader.onload = function(e) {
                     const imageElement = document.getElementById('capturedImage');
                     imageElement.src = e.target.result;
-                    imageElement.style.display = 'block';
+                    imageElement.style.display = 'block';  // 顯示圖片
+                    
+                    // 顯示儲存按鈕
+                    document.getElementById('saveButton').style.display = 'inline-block';
                 };
                 
                 reader.readAsDataURL(file);  // 將文件讀取為Data URL
+            }
+        });
+
+        // 監聽儲存照片的按鈕
+        document.getElementById('saveButton').addEventListener('click', function() {
+            const image = document.getElementById('capturedImage');
+            if (image.src) {
+                const link = document.createElement('a');
+                link.href = image.src;
+                link.download = 'captured_photo.jpg';  // 設定下載的檔案名稱
+                link.click();  // 觸發下載
             }
         });
     </script>
